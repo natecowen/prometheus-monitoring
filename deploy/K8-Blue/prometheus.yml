@@ -1,0 +1,60 @@
+# ------------------- Prometheus - Service for Development ------------------- #
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+  namespace: dev-things
+spec:
+  selector: 
+    app: prometheus-server
+  type: NodePort  
+  ports:
+    - port: 8080
+      targetPort: 9090 
+      nodePort: 30000
+
+---
+# ------------------- Deployment ------------------- #
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: prometheus-deployment
+  namespace: dev-things
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: prometheus-server
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/path:   /
+        prometheus.io/port:   '8080'
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.5.0
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus/"
+            - "--storage.tsdb.retention=7d"
+            - "--web.enable-lifecycle"
+          ports:
+            - containerPort: 9090
+          volumeMounts:
+            - name: prometheus-config-volume
+              mountPath: /etc/prometheus/
+
+            - name: prometheus-storage-volume
+              mountPath: /prometheus/
+      imagePullSecrets:
+        - name: regcred
+      volumes:
+        - name: prometheus-config-volume
+          configMap:
+            # defaultMode: 420
+            name: prometheus-configmap
+        - name: prometheus-storage-volume
+          emptyDir: {}
+
+  

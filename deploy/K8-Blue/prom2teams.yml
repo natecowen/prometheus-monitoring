@@ -1,0 +1,40 @@
+# ------------------- Prometheus msteams for teams - Service for Development ------------------- #
+apiVersion: v1
+kind: Service
+metadata:
+  name: prom2teams-service
+  namespace: dev-things
+spec:
+  selector: 
+    app: prometheus-prom2teams
+  type: NodePort  
+  ports:
+    - port: 2000
+      targetPort: 2000 
+      nodePort: 30003
+
+---
+# ------------------- Deployment ------------------- #
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: prom2teams-deployment
+  namespace: dev-things
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: prometheus-prom2teams
+    spec:
+      containers:
+        - name: prometheus-prom2teams
+          image: bzon/prometheus-msteams:v1.0.1
+          env:
+          - name: TEAMS_INCOMING_WEBHOOK_URL
+            value: "https://outlook.office.com/webhook/dfa98cb3-0ad5-4018-9ac7-f520e463bd2b@d78aee32-8f91-4f9e-90ea-fb72965d9d7c/IncomingWebhook/35b14537952f4400abd1f944e89bb07f/00420757-33b6-4dc3-917d-882a99344ea0"
+          ports:
+            - containerPort: 2000
+      imagePullSecrets:
+        - name: regcred  
+        

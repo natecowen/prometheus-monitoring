@@ -1,0 +1,120 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+rule_files:
+  - '/etc/prometheus/rules.yml'
+
+scrape_configs:
+  - job_name: 'kubernetes-apiservers'
+
+    kubernetes_sd_configs:
+    - role: endpoints
+    scheme: https
+
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+    relabel_configs:
+    - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+      action: keep
+      regex: default;kubernetes;https
+
+  - job_name: 'kubernetes-nodes'
+
+    scheme: https
+
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+    kubernetes_sd_configs:
+    - role: node
+
+    relabel_configs:
+    - action: labelmap
+      regex: __meta_kubernetes_node_label_(.+)
+    - target_label: __address__
+      replacement: kubernetes.default.svc:443
+    - source_labels: [__meta_kubernetes_node_name]
+      regex: (.+)
+      target_label: __metrics_path__
+      replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+    metric_relabel_configs:
+    - action: replace
+      source_labels: [id]
+      regex: '^/machine\.slice/machine-rkt\\x2d([^\\]+)\\.+/([^/]+)\.service$'
+      target_label: rkt_container_name
+      replacement: '${2}-${1}'
+    - action: replace
+      source_labels: [id]
+      regex: '^/system\.slice/(.+)\.service$'
+      target_label: systemd_service_name
+      replacement: '${1}'  
+
+  
+  - job_name: 'CoreDev-pods'
+
+    kubernetes_sd_configs:
+    - role: pod
+
+    relabel_configs:
+      # Grab only coreDev Namepaces
+      - action: keep
+        source_labels: [__meta_kubernetes_namespace]
+        regex: coreDev-production|coreDev-staging|coreDev-development
+      # Update the __meta label to ensure it's kept
+      - action: labelmap 
+        regex: __meta_kubernetes_namespace
+        replacement: kubernetes_namespace
+        # Add Microservice Name
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_app
+        replacement: microservice
+
+  - job_name: 'dev-pods'
+
+    kubernetes_sd_configs:
+    - role: pod
+
+    relabel_configs:
+      # Grab only coreDev Namepaces
+      - action: keep
+        source_labels: [__meta_kubernetes_namespace]
+        regex: dev-things
+      # Update the __meta label to ensure it's kept
+      - action: labelmap 
+        regex: __meta_kubernetes_namespace
+        replacement: kubernetes_namespace
+        # Add Microservice Name
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_app
+        replacement: app_name
+  
+  - job_name: blackbox
+    metrics_path: /probe
+    params: 
+      module: [http_2xx]
+    static_configs:
+    - targets:
+        # API Endpoints
+        - 'https://api.something.com/vitality/report'
+        - 'https://internal-api.something.com/vitality/report'
+        - 'https://sandbox.something.com/vitality/report'
+        - 'https://internal-sandbox.something.com/vitality/report'
+        - 'https://dev-api.something.com/vitality/report'
+        - 'https://dev-api.something.com:30011/vitality/report'
+
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 10.192.60.120:30001
+
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets: ['10.192.60.120:30002']

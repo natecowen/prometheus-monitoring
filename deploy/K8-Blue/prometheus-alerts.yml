@@ -1,0 +1,51 @@
+# ------------------- Prometheus Alertmanager - Service for Development ------------------- #
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-service
+  namespace: dev-things
+spec:
+  selector: 
+    app: prometheus-alertmanager
+  type: NodePort  
+  ports:
+    - port: 9093
+      targetPort: 9093 
+      nodePort: 30002
+
+---
+# ------------------- Deployment ------------------- #
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: alertmanager-deployment
+  namespace: dev-things
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: prometheus-alertmanager
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/path:   /metrics
+        #prometheus.io/port:   '8080'
+    spec:
+      containers:
+        - name: prometheus-alertmanager
+          image: prom/alertmanager:v0.15.3
+          args:
+            - "--config.file=/etc/alert-conf-blue.yml"
+            - "--storage.path=/data"
+            - "--web.external-url=/"
+          ports:
+            - containerPort: 9093
+          volumeMounts:
+            - name: storage-volume
+              mountPath: "/data"
+              subPath: ""
+      imagePullSecrets:
+        - name: regcred  
+      volumes:
+        - name: storage-volume
+          emptyDir: {}

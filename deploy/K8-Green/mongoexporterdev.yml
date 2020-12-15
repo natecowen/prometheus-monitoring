@@ -1,0 +1,41 @@
+# ------------------- MongoExporter - Service for Development ------------------- #
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongoexporter-dev-service
+  namespace: dev-things
+spec:
+  selector: 
+    app: prom-mongoexporter-dev
+  type: NodePort  
+  ports:
+    - port: 9001
+      targetPort: 9001 
+      nodePort: 30007
+---
+# ------------------- Deployment ------------------- #
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: mongoexporter-dev-deployment
+  namespace: dev-things
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: prom-mongoexporter-dev
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/path:   /metrics
+    spec:
+      containers:
+        - name: prom-mongoexporter-dev
+          image: registry.something/mongoexporter:latest
+          ports:
+            - containerPort: 9001
+          env:
+          - name: MONGODB_URL
+            value: "mongodb://10.192.60.1:47017,10.192.2.83:47017,10.192.3.84:47017/?replicaSet=rs-dev"
+      imagePullSecrets:
+        - name: regcred  

@@ -1,0 +1,43 @@
+# ------------------- Grafana - Service for Development ------------------- #
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: dev-things
+spec:
+  selector: 
+    app: grafana
+  type: NodePort  
+  ports:
+    - port: 3000
+      targetPort: 3000 
+      nodePort: 30004
+
+---
+# ------------------- Deployment ------------------- #
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: grafana-deployment
+  namespace: dev-things
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: grafana
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/path:   /metrics
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:5.4.1
+          ports:
+            - containerPort: 3000
+          env:
+          - name: GF_AUTH_ANONYMOUS_ENABLED
+            value: "true" 
+      imagePullSecrets:
+        - name: regcred  
+
